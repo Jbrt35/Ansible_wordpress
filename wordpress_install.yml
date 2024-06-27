@@ -9,12 +9,7 @@
     - name: Attendre la libération du verrou apt                                                                            
       command: >                                                                                                            
         bash -c 'while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1; do sleep 1; done'         
-                                                                                                                            
-    - name: Mise à jour des dépôts et des paquets                                                                           
-      apt:
-        update_cache: yes
-        upgrade: dist
-
+                                                                                                                          
     - name: Ajouter le dépôt pour PHP 8.2
       apt_repository:
         repo: ppa:ondrej/php
