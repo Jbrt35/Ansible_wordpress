@@ -1,1 +1,111 @@
+---                                                                                                                         
+- name: Installation de WordPress sur un serveur Debian                                                                     
+  hosts: wordpress-servers                                                                                                  
+  become: yes                                                                                                               
+  tasks:                                                                                                                    
+    - name: S'assurer que dpkg n'est pas interrompu                                                                         
+      command: sudo dpkg --configure -a                                                                                     
+                                                                                                                            
+    - name: Attendre la libération du verrou apt                                                                            
+      command: >                                                                                                            
+        bash -c 'while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1; do sleep 1; done'         
+                                                                                                                            
+    - name: Mise à jour des dépôts et des paquets                                                                           
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Ajouter le dépôt pour PHP 8.2
+      apt_repository:
+        repo: ppa:ondrej/php
+        state: present
+
+    - name: Installation d'Apache
+      apt:
+        name: apache2
+        state: present
+
+    - name: Activation et démarrage du service Apache
+      systemd:
+        name: apache2
+        enabled: yes
+        state: started
+
+    - name: Installation des dépendances PHP
+      apt:
+        name: 
+          - php8.2
+          - php8.2-cli
+          - php8.2-common
+          - php8.2-imap
+          - php8.2-redis
+          - php8.2-snmp
+          - php8.2-xml
+          - php8.2-mysqli
+          - php8.2-zip
+          - php8.2-mbstring
+          - php8.2-curl
+          - libapache2-mod-php
+        state: present
+
+    - name: Installation de MariaDB
+      apt:
+        name: mariadb-server
+        state: present
+
+    - name: Activation et démarrage du service MariaDB
+      systemd:
+        name: mariadb
+        enabled: yes
+        state: started
+
+    - name: Téléchargement et installation de WordPress
+      command: >
+        curl -o /tmp/latest.zip https://wordpress.org/latest.zip
+      register: download_wordpress
+
+    - name: Décompression de WordPress
+      unarchive:
+        src: /tmp/latest.zip
+        dest: /var/www/html/
+        remote_src: yes
+
+    - name: Changement de propriétaire des fichiers WordPress
+      file:
+        path: /var/www/html/wordpress
+        owner: www-data
+        group: www-data
+        recurse: yes
+
+    - name: Modification des permissions des répertoires
+      find:
+        paths: /var/www/html/wordpress
+        recurse: yes
+        patterns: '*'
+        use_regex: no
+      register: wordpress_files
+
+    - name: Configuration de wp-config.php
+      template:
+        src: wp-config.php.j2
+        dest: /var/www/html/wordpress/wp-config.php
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Création du fichier de configuration Apache pour WordPress
+      template:
+        src: wordpress.conf.j2
+        dest: /etc/apache2/sites-available/wordpress.conf
+
+    - name: Activation du module rewrite d'Apache
+      command: a2enmod rewrite
+
+    - name: Activation du site WordPress
+      command: a2ensite wordpress.conf
+
+    - name: Rechargement du service Apache
+      systemd:
+        name: apache2
+        state: reloaded
 
