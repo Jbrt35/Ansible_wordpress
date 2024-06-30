@@ -1,19 +1,29 @@
----                                                                                                                         
-- name: Installation de WordPress sur un serveur Debian                                                                     
-  hosts: wordpress-servers                                                                                                  
-  become: yes                                                                                                               
-  tasks:                                                                                                                    
-    - name: S'assurer que dpkg n'est pas interrompu                                                                         
-      command: sudo dpkg --configure -a                                                                                     
-                                                                                                                            
-    - name: Attendre la libération du verrou apt                                                                            
-      command: >                                                                                                            
-        bash -c 'while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1; do sleep 1; done'         
-                                                                                                                          
+---
+- name: Installation de WordPress sur un serveur Debian
+  hosts: wordpress-servers
+  become: yes
+
+  tasks:
+    - name: S'assurer que dpkg n'est pas interrompu
+      command: sudo dpkg --configure -a
+
+    - name: Attendre la libération du verrou apt
+      command: >-
+        bash -c 'while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1; do sleep 1; done'
+
     - name: Ajouter le dépôt pour PHP 8.2
-      apt_repository:
-        repo: ppa:ondrej/php
-        state: present
+      block:
+        - name: Ajouter le référentiel PHP 8.2
+          apt_repository:
+            repo: "deb http://deb.debian.org/debian bookworm main"
+            state: present
+            update_cache: yes
+            validate_certs: yes
+
+        - name: référentiel
+          shell: sudo mv /etc/apt/sources.list /etc/apt/sources.list.backup && sudo touch /etc/apt/sources.list
+
+      when: ansible_distribution_version == 'bookworm'
 
     - name: Installation d'Apache
       apt:
@@ -28,7 +38,7 @@
 
     - name: Installation des dépendances PHP
       apt:
-        name: 
+        name:
           - php8.2
           - php8.2-cli
           - php8.2-common
@@ -53,7 +63,7 @@
         name: mariadb
         enabled: yes
         state: started
-
+        
     - name: Téléchargement et installation de WordPress
       command: >
         curl -o /tmp/latest.zip https://wordpress.org/latest.zip
